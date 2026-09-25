@@ -2,7 +2,7 @@
 
 #' Default primary-assembly chromosome names
 #'
-#' The human primary assembly, in the order POLARIS has always used.
+#' The human primary assembly, in the order scOnion has always used.
 #' @noRd
 .default_chrs <- function() paste0("chr", c(seq_len(22), "X", "Y"))
 
@@ -13,7 +13,7 @@
 #' assembly, so features on chrM, on unplaced scaffolds (`GL000194.1`) and on
 #' patch contigs (`chr1_KI270706v1_random`) return `NA` and are excluded from
 #' the per-chromosome feature embedding. That is the historical behaviour; what
-#' is new is that [Polaris()] now reports how many were dropped instead of
+#' is new is that [Onion()] now reports how many were dropped instead of
 #' doing it silently.
 #'
 #' The trailing word boundary is what keeps `chr2` from matching `chr20`: `\\d+`
@@ -59,7 +59,7 @@
 
 #' Rank from the singular-value ratio rule
 #'
-#' Implements the denoiser of the POLARIS Methods,
+#' Implements the denoiser of the scOnion Methods,
 #' \eqn{k = \max\{j : \sigma_j / \sigma_{j+1} > T\}}.
 #'
 #' The original code wrote this as `which(...) %>% max()`, which returns `-Inf`
@@ -134,7 +134,7 @@
 #' do not want in a package: consecutive fits of the same data differ (by about
 #' 1e-9 in the singular values, so scientifically irrelevant but not bit
 #' reproducible), and the caller's random stream is advanced as a side effect, so
-#' anything the user seeded around a POLARIS fit stops being reproducible.
+#' anything the user seeded around an scOnion fit stops being reproducible.
 #'
 #' This saves `.Random.seed`, sets a fixed seed, evaluates, and restores the
 #' previous state on exit. `RSpectra::svds` needs none of this; it is already
@@ -165,7 +165,7 @@
 #'
 #' Neither iterative solver is appropriate when the requested rank is a large
 #' fraction of `min(dim)`: irlba then warns that it did not converge and its
-#' trailing directions are unreliable, which matters because POLARIS uses all of
+#' trailing directions are unreliable, which matters because scOnion uses all of
 #' them. Below that ratio an exact full SVD is both faster and correct, so small
 #' inputs take that path. `RSpectra::svds` already does this internally; irlba
 #' does not.
@@ -187,7 +187,7 @@
     irlba::irlba(x, nv = k, nu = k),
     warning = function(w) {
       ## Never swallow a convergence failure: the retained subspace may be
-      ## wrong, and Polaris uses all of it.
+      ## wrong, and Onion uses all of it.
       if (grepl("did not converge", conditionMessage(w), fixed = TRUE))
         warning(sprintf(paste0("The truncated SVD did not converge (%d ",
                                "components of a %d x %d matrix). The denoised ",
@@ -199,7 +199,7 @@
 
 #' Column standard deviations
 #'
-#' Called only by [Polaris()], to decide which features clear the `x.sds` and
+#' Called only by [Onion()], to decide which features clear the `x.sds` and
 #' `y.sds` variance floors. Only the comparison `sd > floor` propagates; the
 #' standard deviations themselves never enter the decomposition.
 #'
@@ -246,7 +246,7 @@
     out <- sqrt(ss / (n - 1))
     ## Names are part of the old contract: colSds() returned them under
     ## useNames = TRUE, and the sparse branch keeps them via colSums(). Nothing
-    ## downstream reads them, since Polaris() subsets with a logical vector, but
+    ## downstream reads them, since Onion() subsets with a logical vector, but
     ## matching the old return value keeps comparisons meaningful.
     names(out) <- colnames(x)
     out

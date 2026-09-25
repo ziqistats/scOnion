@@ -18,7 +18,7 @@
 #'   private rather than shared factors. These are the low-concordance cells.
 #' @param feature.names Whether to name modality-2 features as genomic
 #'   intervals (`chr1-100-600`, ...) so the simulation can be passed through
-#'   [SkymapLinkageTable()]. Default `TRUE`.
+#'   [OnionLinkageTable()]. Default `TRUE`.
 #'
 #' @return A list with
 #'   \describe{
@@ -32,13 +32,13 @@
 #'
 #' @examples
 #' set.seed(1)
-#' sim <- polarisSimulate(n = 200, g = 60, p = 80, r = 5)
-#' fit <- SkymapSimScore(Polaris(sim$X, sim$Y, x.sds = 0, verbose = FALSE))
+#' sim <- onionSimulate(n = 200, g = 60, p = 80, r = 5)
+#' fit <- OnionConcordance(Onion(sim$X, sim$Y, x.sds = 0, verbose = FALSE))
 #' # discordant cells should score lower
 #' tapply(fit$concordance, sim$shared < 0.5, mean)
 #'
 #' @export
-polarisSimulate <- function(n = 300, g = 80, p = 120, r = 5,
+onionSimulate <- function(n = 300, g = 80, p = 120, r = 5,
                             noise = 0.5, discordant = 0.2,
                             feature.names = TRUE) {
 

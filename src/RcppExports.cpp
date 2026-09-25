@@ -13,7 +13,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // matrixMultiplyEigen
 Eigen::MatrixXd matrixMultiplyEigen(const Eigen::Map<Eigen::MatrixXd>& A, const Eigen::Map<Eigen::MatrixXd>& B);
-RcppExport SEXP _POLARIS_matrixMultiplyEigen(SEXP ASEXP, SEXP BSEXP) {
+RcppExport SEXP _scOnion_matrixMultiplyEigen(SEXP ASEXP, SEXP BSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -25,7 +25,7 @@ END_RCPP
 }
 // matrixMultSparseDense
 Eigen::MatrixXd matrixMultSparseDense(const Eigen::Map<Eigen::SparseMatrix<double> >& A, const Eigen::Map<Eigen::MatrixXd>& B);
-RcppExport SEXP _POLARIS_matrixMultSparseDense(SEXP ASEXP, SEXP BSEXP) {
+RcppExport SEXP _scOnion_matrixMultSparseDense(SEXP ASEXP, SEXP BSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -37,12 +37,12 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_POLARIS_matrixMultiplyEigen", (DL_FUNC) &_POLARIS_matrixMultiplyEigen, 2},
-    {"_POLARIS_matrixMultSparseDense", (DL_FUNC) &_POLARIS_matrixMultSparseDense, 2},
+    {"_scOnion_matrixMultiplyEigen", (DL_FUNC) &_scOnion_matrixMultiplyEigen, 2},
+    {"_scOnion_matrixMultSparseDense", (DL_FUNC) &_scOnion_matrixMultSparseDense, 2},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_POLARIS(DllInfo *dll) {
+RcppExport void R_init_scOnion(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

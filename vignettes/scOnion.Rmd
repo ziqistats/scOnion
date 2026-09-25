@@ -1,10 +1,10 @@
 ---
-title: "Getting started with POLARIS"
+title: "Getting started with scOnion"
 output:
   rmarkdown::html_vignette:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Getting started with POLARIS}
+  %\VignetteIndexEntry{Getting started with scOnion}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -13,7 +13,7 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-POLARIS takes two matrices measured on the same cells and returns three things
+scOnion takes two matrices measured on the same cells and returns three things
 from one closed-form decomposition:
 
 1. a **per-cell concordance score**, saying how far the two modalities agree
@@ -31,29 +31,29 @@ walkthrough on a public multiome dataset; those blocks are shown but not run,
 because they need a multi-gigabyte download and several minutes of compute.
 
 ```{r}
-library(POLARIS)
+library(scOnion)
 ```
 
 # A worked example on simulated data
 
-`polarisSimulate()` builds two modalities sharing a low-rank structure, where a
+`onionSimulate()` builds two modalities sharing a low-rank structure, where a
 known subset of cells is driven by private rather than shared factors. Those
 cells are cross-modality discordant by construction, which gives us a ground
 truth to check the score against.
 
 ```{r}
 set.seed(42)
-sim <- polarisSimulate(n = 400, g = 80, p = 120, r = 5, discordant = 0.3)
+sim <- onionSimulate(n = 400, g = 80, p = 120, r = 5, discordant = 0.3)
 dim(sim$X)
 dim(sim$Y)
 ```
 
 Both matrices are **cells in rows, features in columns**. This is the
-orientation POLARIS expects, and it is the transpose of how Seurat stores
+orientation scOnion expects, and it is the transpose of how Seurat stores
 assays.
 
 ```{r}
-fit <- Polaris(sim$X, sim$Y, gene.chr.ref = sim$anno,
+fit <- Onion(sim$X, sim$Y, gene.chr.ref = sim$anno,
                x.sds = 0, verbose = FALSE)
 fit
 ```
@@ -61,7 +61,7 @@ fit
 ## The concordance score
 
 ```{r}
-fit <- SkymapSimScore(fit)
+fit <- OnionConcordance(fit)
 summary(fit$concordance)
 ```
 
@@ -79,11 +79,11 @@ tapply(fit$concordance, ifelse(sim$shared < 0.5, "discordant", "concordant"),
 
 ## Feature linkage
 
-`SkymapLinkageTable()` enumerates candidate pairs within a genomic window of
+`OnionLinkageTable()` enumerates candidate pairs within a genomic window of
 each gene's transcription start site and scores them.
 
 ```{r}
-tab <- SkymapLinkageTable(fit, gene.anno = sim$anno, window = 1e6,
+tab <- OnionLinkageTable(fit, gene.anno = sim$anno, window = 1e6,
                           verbose = FALSE)
 head(tab[, c("gene", "peak", "dist", "score_raw", "SE", "score_adj")])
 ```
@@ -95,19 +95,19 @@ omitted-cell scores follow from two matrix-vector products.
 ## Ranking by `z_dev`, not by magnitude
 
 Raw scores decay with genomic distance, so ranking by `score_raw` recovers
-proximity rather than regulation. `SkymapZdev()` standardizes within fixed
+proximity rather than regulation. `OnionZdev()` standardizes within fixed
 distance strata:
 
 ```{r}
-tab <- SkymapZdev(tab)
+tab <- OnionZdev(tab)
 head(tab[order(-tab$z_dev), c("gene", "peak", "dist", "distbin", "z_dev")])
 ```
 
-This is the statistic the POLARIS benchmarks rank by. Distance-stratified
+This is the statistic the scOnion benchmarks rank by. Distance-stratified
 analyses also exclude pairs closer than 10 kb, which is not done for you:
 
 ```{r}
-tab <- tab[tab$dist >= POLARIS_MIN_DIST, ]
+tab <- tab[tab$dist >= ONION_MIN_DIST, ]
 nrow(tab)
 ```
 
@@ -130,7 +130,7 @@ the whole experiment rather than a toy subset.
 
 ```r
 # SeuratData is not on CRAN, so install it from GitHub once. Its current
-# release requires Seurat 5; POLARIS itself works with Seurat 4 or 5.
+# release requires Seurat 5; scOnion itself works with Seurat 4 or 5.
 # install.packages("remotes")
 # remotes::install_github("satijalab/seurat-data")
 
@@ -142,21 +142,21 @@ pbmc.rna  <- LoadData("pbmcMultiome", "pbmc.rna")    # 36,601 genes  x 11,909 ce
 pbmc.atac <- LoadData("pbmcMultiome", "pbmc.atac")   # 108,377 peaks x 11,909 cells
 ```
 
-The peaks are already named `chr1-10109-10357`. POLARIS parses that form
+The peaks are already named `chr1-10109-10357`. scOnion parses that form
 directly, so no renaming is needed. `pbmc.rna` also carries
 `seurat_annotations`, the cell type labels from the original analysis, which we
 use at the end.
 
 ## Assembling one object
 
-POLARIS needs both modalities on the same cells, in the same order. We build the
+scOnion needs both modalities on the same cells, in the same order. We build the
 object from the raw count matrices so that nothing depends on which Seurat
 version wrote the files.
 
 ```r
 library(Seurat)
 library(Signac)
-library(POLARIS)
+library(scOnion)
 
 # The label "filtered" marks cells the original analysis rejected at QC. Dropping
 # those, and any cell without a label, leaves 10,412 of the 11,909.
@@ -176,17 +176,17 @@ obj[["ATAC"]] <- Signac::CreateChromatinAssay(counts = atac.counts, sep = c("-",
 obj$celltype  <- as.character(pbmc.rna$seurat_annotations[cells])
 ```
 
-## Preprocessing, which POLARIS does not do for you
+## Preprocessing, which scOnion does not do for you
 
-Normalization is a methodological choice, so POLARIS takes matrices that are
-already normalized. These are the conventions used in the POLARIS paper.
+Normalization is a methodological choice, so scOnion takes matrices that are
+already normalized. These are the conventions used in the scOnion paper.
 
 ```r
 DefaultAssay(obj) <- "RNA"
 obj <- NormalizeData(obj, normalization.method = "LogNormalize",
                      scale.factor = 1e6)
 
-# ScaleData runs on ALL genes, not on the variable features. POLARIS selects its
+# ScaleData runs on ALL genes, not on the variable features. scOnion selects its
 # own feature space through the x.sds variance floor, which is deliberately
 # broader than a highly-variable-gene list. Variable features are for an
 # RNA-only PCA elsewhere; they are not used to build X.
@@ -208,7 +208,7 @@ dim(X)   # 10,412 cells x 36,601 genes, dense, about 2.8 GB
 dim(Y)   # 10,412 cells x 108,377 peaks, sparse
 ```
 
-Keeping `Y` sparse matters. POLARIS picks a different truncated-SVD solver for a
+Keeping `Y` sparse matters. scOnion picks a different truncated-SVD solver for a
 sparse second modality, and densifying 108,377 peaks would cost memory for
 nothing.
 
@@ -220,14 +220,14 @@ strand-aware resize.
 
 ```r
 # Bundled Cell Ranger ARC GRCh38 table, which matches this dataset.
-anno <- polarisTSSRef("hg38")
+anno <- onionTSSRef("hg38")
 
 # Alternatives: the annotation already attached to a Signac assay, which is the
 # safest source because it is guaranteed to match your peaks, or one built from
 # any TxDb, EnsDb or GTF.
 # anno <- Signac::Annotation(obj[["ATAC"]])
-# anno <- polarisMakeTSSRef(EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86)
-# anno <- polarisMakeTSSRef("path/to/genes.gtf.gz")
+# anno <- onionMakeTSSRef(EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86)
+# anno <- onionMakeTSSRef("path/to/genes.gtf.gz")
 ```
 
 ## The fit
@@ -236,7 +236,7 @@ anno <- polarisTSSRef("hg38")
 # mc.cores parallelizes the per-chromosome feature decomposition only.
 # gene.chr.ref is what makes linkage cis; leave it NULL for modality pairs with
 # no genomic coordinates, such as CITE-seq.
-fit <- Polaris(X, Y, gene.chr.ref = anno, mc.cores = 4, verbose = TRUE)
+fit <- Onion(X, Y, gene.chr.ref = anno, mc.cores = 4, verbose = TRUE)
 ```
 
 With `verbose = TRUE` this narrates what it decides, and those messages are
@@ -251,33 +251,33 @@ worth reading:
   patch contigs. Those are excluded from the per-chromosome step and reported
   rather than dropped silently.
 
-The result is a `skymap`, a plain named list with a `print` method:
+The result is an `Onion`, a plain named list with a `print` method:
 
 ```r
 fit                        # dimensions, selected ranks, what is stored
 
-fit$skymap.cell            # cells x (r3 + r4), the joint embedding
-fit$skymap.U               # cells x r3, the X-side paired coordinates
-fit$skymap.V               # cells x r4, the Y-side paired coordinates
-fit$skymap.P               # genes x r5, genome-wide gene loadings
-fit$skymap.Q               # peaks x r5, genome-wide peak loadings
-fit$skymap.feature.chr     # per-chromosome P, Q and singular values
-fit$input.param            # every threshold and rank actually used
+fit$W                 # cells x (r3 + r4), the joint embedding (the cross-section)
+fit$U                 # cells x r3, the X-side paired coordinates (one half)
+fit$V                 # cells x r4, the Y-side paired coordinates (the other)
+fit$P                 # genes x r5, genome-wide gene loadings
+fit$Q                 # peaks x r5, genome-wide peak loadings
+fit$per.chr           # per-chromosome P, Q and singular values
+fit$input.param       # every threshold and rank actually used
 
-polarisFitSummary(fit)     # the same settings as a one-row data frame
-polarisSpectrum(fit)       # the singular values, to redraw the denoiser plot
+onionFitSummary(fit)  # the same settings as a one-row data frame
+onionSpectrum(fit)    # the singular values, to redraw the denoiser plot
 ```
 
 ## Per-cell concordance
 
 ```r
-fit <- SkymapSimScore(fit)
+fit <- OnionConcordance(fit)
 
 summary(fit$concordance)
 
 # Concordance varies systematically across populations, so it is worth looking
 # at by cell type rather than in aggregate.
-sort(tapply(fit$concordance, obj$celltype[rownames(fit$skymap.cell)], median))
+sort(tapply(fit$concordance, obj$celltype[rownames(fit$W)], median))
 ```
 
 Two cautions. Concordance is not a quality score, and a low value is not a bad
@@ -291,7 +291,7 @@ biological. Compare like with like.
 ```r
 # Enumerate gene-peak pairs within 1 Mb of each TSS and score them. On the full
 # 10,412 cells this gives about 1.8 million pairs.
-tab <- SkymapLinkageTable(fit, gene.anno = anno, window = 1e6, mc.cores = 16)
+tab <- OnionLinkageTable(fit, gene.anno = anno, window = 1e6, mc.cores = 16)
 
 colnames(tab)
 # gene, peak, chr, dist, score_raw, SE, score_adj, p_lfsr, q_lfsr
@@ -308,10 +308,10 @@ want scores.
 ## Ranking
 
 ```r
-tab <- SkymapZdev(tab)      # adds distbin, mu0, z_dev and z_dev_fl
+tab <- OnionZdev(tab)      # adds distbin, mu0, z_dev and z_dev_fl
 
 # Always apply the distance floor before ranking. It is not done for you.
-tab <- tab[tab$dist >= POLARIS_MIN_DIST, ]
+tab <- tab[tab$dist >= ONION_MIN_DIST, ]
 
 head(tab[order(-tab$z_dev), c("gene", "peak", "dist", "score_raw", "SE", "z_dev")])
 ```
@@ -333,21 +333,21 @@ supported route is to fit that population:
 
 ```r
 mono  <- colnames(obj)[obj$celltype == "CD14 Mono"]
-fit.m <- Polaris(X[mono, ], Y[mono, ], gene.chr.ref = anno, mc.cores = 4)
-tab.m <- SkymapZdev(SkymapLinkageTable(fit.m, gene.anno = anno, mc.cores = 4))
+fit.m <- Onion(X[mono, ], Y[mono, ], gene.chr.ref = anno, mc.cores = 4)
+tab.m <- OnionZdev(OnionLinkageTable(fit.m, gene.anno = anno, mc.cores = 4))
 ```
 
 Note what does **not** work, because it fails quietly. Restricting
-`fit$skymap.cell` to a subset of cells and reusing the global fit leaves
+`fit$W` to a subset of cells and reusing the global fit leaves
 `score_raw` bit-for-bit unchanged, since the score is read from
-`skymap.feature.chr`, which `Polaris()` built once on all cells. The standard
+`per.chr`, which `Onion()` built once on all cells. The standard
 error does respond to the subset. On this dataset, restricting to the 721 CD14
 monocytes moves the median `SE` from 5.32 to 1.32 while every score stays
 identical, so the resulting `z_dev` divides a score computed on 3,000 cells by an
 error computed on 721. Nothing errors; the ranking is simply wrong. Fit the
 population instead, as above.
 
-The POLARIS paper's cell-type panels use a third route, reusing the global cell
+The scOnion paper's cell-type panels use a third route, reusing the global cell
 embedding and recomputing only the feature projection on the subset. That is not
 exposed by this package.
 
@@ -366,28 +366,28 @@ way to rehearse the workflow before committing to the full dataset.
 
 # Working from a Seurat object directly
 
-`RunPolaris()` assembles the arguments and returns the joint embedding as a
+`RunOnion()` assembles the arguments and returns the joint embedding as a
 `DimReduc`, so it drops into the usual Seurat workflow:
 
 ```r
-res <- RunPolaris(obj, assay.x = "RNA", assay.y = "ATAC", mc.cores = 4)
+res <- RunOnion(obj, assay.x = "RNA", assay.y = "ATAC", mc.cores = 4)
 
-res$object <- Seurat::FindNeighbors(res$object, reduction = "polaris",
-                                    dims = seq_len(ncol(res$skymap$skymap.cell)))
+res$object <- Seurat::FindNeighbors(res$object, reduction = "onion",
+                                    dims = seq_len(ncol(res$fit$W)))
 res$object <- Seurat::FindClusters(res$object, resolution = 0.4)
 
-res$skymap <- SkymapSimScore(res$skymap)
-res$object$concordance <- res$skymap$concordance[colnames(res$object)]
+res$fit <- OnionConcordance(res$fit)
+res$object$concordance <- res$fit$concordance[colnames(res$object)]
 ```
 
-It takes the layers POLARIS expects by default, `scale.data` for RNA and `data`
+It takes the layers scOnion expects by default, `scale.data` for RNA and `data`
 for ATAC, transposes them for you, and picks up the annotation attached to the
-ATAC assay when there is one. `Polaris()` on plain matrices remains the
+ATAC assay when there is one. `Onion()` on plain matrices remains the
 reproducible entry point; this only assembles its arguments.
 
 # The `x.sds` floor
 
-`Polaris()` keeps features of $X$ whose standard deviation exceeds `x.sds`,
+`Onion()` keeps features of $X$ whose standard deviation exceeds `x.sds`,
 default `0.95`, and features of $Y$ above `y.sds`, default `0`. The asymmetry is
 intentional: $X$ is expected to be z-scored, so a floor near 1 selects genes
 retaining appreciable variance, while $Y$ is on a different scale and only
@@ -399,24 +399,24 @@ Pass `x.sds = 0` in that case, as the CITE-seq analyses do.
 
 # Beyond RNA and ATAC
 
-POLARIS is a general two-modality method. The genomic layer is optional:
+scOnion is a general two-modality method. The genomic layer is optional:
 `gene.chr.ref` and the per-chromosome decomposition exist only to make linkage
 *cis*, and without them you still get the concordance score, the joint
-embedding, and the genome-wide loadings in `skymap.P` and `skymap.Q`.
+embedding, and the genome-wide loadings in `P` and `Q`.
 
 For CITE-seq, $Y$ is the CLR-normalized ADT matrix. Protein features have no
 genomic coordinate, so `z_dev` is undefined for protein-gene pairs; score them
 from the loadings with an unweighted cosine instead.
 
 ```r
-fit <- Polaris(t(obj[["RNA"]]$scale.data), t(obj[["ADT"]]$data), x.sds = 0)
-P <- fit$skymap.P; Q <- fit$skymap.Q
+fit <- Onion(t(obj[["RNA"]]$scale.data), t(obj[["ADT"]]$data), x.sds = 0)
+P <- fit$P; Q <- fit$Q
 cosine <- (P / sqrt(rowSums(P^2))) %*% t(Q / sqrt(rowSums(Q^2)))
 ```
 
 # Notes on performance
 
-`Polaris()` is CPU-only. Its dominant cost is the two truncated SVDs, which are
+`Onion()` is CPU-only. Its dominant cost is the two truncated SVDs, which are
 BLAS-bound for a dense $X$. The difference between R's reference BLAS and a
 threaded one is large, on the order of 25x for that step, so linking R against
 OpenBLAS or Accelerate is the single most effective speedup available.
@@ -425,7 +425,7 @@ OpenBLAS or Accelerate is the single most effective speedup available.
 is fork-based and therefore serial on Windows.
 
 Fits are deterministic. The truncated SVD used for $X$ draws a random starting
-vector, so POLARIS fixes a seed internally and restores the previous RNG state
+vector, so scOnion fixes a seed internally and restores the previous RNG state
 afterwards, leaving your own random stream untouched.
 
 ```{r}

@@ -1,11 +1,11 @@
-Package: POLARIS
+Package: scOnion
 Title: Concordance-Aware Integration of Paired Single-Cell Multiomic Data
-Version: 0.99.1
+Version: 0.99.2
 Authors@R: c(
     person("Ziqi", "Fu", email = "ziqi_fu@hsph.harvard.edu",
            role = c("aut", "cre")))
-Description: POLARIS is a concordance-aware framework for paired single-cell
-    multiomic assays that profile two modalities in the same cells, such as
+Description: A concordance-aware framework for paired single-cell multiomic
+    assays that profile two modalities in the same cells, such as
     RNA with ATAC or RNA with surface protein. From a single closed-form
     spectral decomposition it returns a per-cell cross-modality concordance
     score, a joint cell embedding that preserves structure supported by either
@@ -15,8 +15,9 @@ Description: POLARIS is a concordance-aware framework for paired single-cell
     genomic-distance-aware z-statistic, so candidate pairs can be ranked with
     uncertainty rather than by magnitude alone. The feature embedding can be
     recomputed on any subset of cells without refitting, giving cell-type
-    specific linkage from one global fit. POLARIS runs on CPU and scales to
-    tens of thousands of cells.
+    specific linkage from one global fit. scOnion runs on CPU and scales to
+    tens of thousands of cells. It was distributed as POLARIS until version
+    0.99.1, and the old names still work.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.2.0)
@@ -50,9 +51,25 @@ Suggests:
     rmarkdown
 biocViews: SingleCell, DimensionReduction, GeneExpression, ATACSeq,
     Epigenetics, GeneRegulation, Software, Transcriptomics, Clustering
-URL: https://github.com/zfu17/POLARIS
-BugReports: https://github.com/zfu17/POLARIS/issues
+URL: https://github.com/ziqistats/scOnion
+BugReports: https://github.com/ziqistats/scOnion/issues
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Config/testthat/edition: 3
+Collate: 
+    'Onion-class.R'
+    'RcppExports.R'
+    'annotation.R'
+    'concordance.R'
+    'zdev.R'
+    'deprecated.R'
+    'linkage.R'
+    'neighbors.R'
+    'onion.R'
+    'provenance.R'
+    'reductions.R'
+    'scOnion-package.R'
+    'seurat.R'
+    'simulate.R'
+    'utils.R'

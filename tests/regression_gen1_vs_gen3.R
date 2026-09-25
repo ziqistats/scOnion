@@ -45,11 +45,16 @@ g1 <- get("SkymapSimScore", envir = gen1)(g1, metric = "cosine")
 cat(sprintf("\nGen 1: %.1f s\n", as.numeric(difftime(Sys.time(), t0, units = "secs"))))
 
 t0 <- Sys.time()
-g3 <- POLARIS::Polaris(X, Y, gene.chr.ref = anno, mc.cores = 1, verbose = FALSE)
-g3 <- POLARIS::SkymapSimScore(g3)
+g3 <- scOnion::Onion(X, Y, gene.chr.ref = anno, mc.cores = 1, verbose = FALSE)
+g3 <- scOnion::OnionConcordance(g3)
 cat(sprintf("Gen 3 (package): %.1f s\n\n", as.numeric(difftime(Sys.time(), t0, units = "secs"))))
 
 pass <- TRUE
+## The package names its elements after the Methods symbols (W, U, V, P, Q,
+## per.chr); the reference objects keep the skymap.* names of the script era.
+.nm <- c(skymap.cell = "W", skymap.U = "U", skymap.V = "V", skymap.P = "P",
+         skymap.Q = "Q", skymap.feature.chr = "per.chr",
+         stdev.cell = "stdev.cell", stdev.feature = "stdev.feature")
 chk <- function(label, ok, detail = "") {
   pass <<- pass && isTRUE(ok)
   cat(sprintf("[%s] %-48s %s\n", if (isTRUE(ok)) "PASS" else "FAIL", label, detail))
@@ -66,24 +71,24 @@ maxad <- function(a, b) {
 }
 
 ## ---- the feature space must be identical: same filter, same input ----------
-chk("gene set identical", identical(rownames(g3$skymap.P), rownames(g1$skymap.P)),
-    sprintf("%d vs %d", nrow(g3$skymap.P), nrow(g1$skymap.P)))
-chk("peak set identical", identical(rownames(g3$skymap.Q), rownames(g1$skymap.Q)),
-    sprintf("%d vs %d", nrow(g3$skymap.Q), nrow(g1$skymap.Q)))
+chk("gene set identical", identical(rownames(g3$P), rownames(g1$skymap.P)),
+    sprintf("%d vs %d", nrow(g3$P), nrow(g1$skymap.P)))
+chk("peak set identical", identical(rownames(g3$Q), rownames(g1$skymap.Q)),
+    sprintf("%d vs %d", nrow(g3$Q), nrow(g1$skymap.Q)))
 
 ## ---- cell-side ranks and embedding -----------------------------------------
-chk("r3 identical", ncol(g3$skymap.U) == ncol(g1$skymap.U),
-    sprintf("%d vs %d", ncol(g3$skymap.U), ncol(g1$skymap.U)))
-chk("r4 identical", ncol(g3$skymap.V) == ncol(g1$skymap.V),
-    sprintf("%d vs %d", ncol(g3$skymap.V), ncol(g1$skymap.V)))
+chk("r3 identical", ncol(g3$U) == ncol(g1$skymap.U),
+    sprintf("%d vs %d", ncol(g3$U), ncol(g1$skymap.U)))
+chk("r4 identical", ncol(g3$V) == ncol(g1$skymap.V),
+    sprintf("%d vs %d", ncol(g3$V), ncol(g1$skymap.V)))
 note("r5 (expected to differ: Jun 21 QR change)",
-     sprintf("Gen3 %d vs Gen1 %d", ncol(g3$skymap.P), ncol(g1$skymap.P)))
+     sprintf("Gen3 %d vs Gen1 %d", ncol(g3$P), ncol(g1$skymap.P)))
 
 d <- maxad(g3$stdev.cell, g1$stdev.cell)
 chk("stdev.cell agrees < 1e-6", d < 1e-6, sprintf("%.3e", d))
 
 for (s in c("skymap.U", "skymap.V")) {
-  cc <- colcor(g3[[s]], g1[[s]])
+  cc <- colcor(g3[[.nm[[s]]]], g1[[s]])
   chk(paste(s, "min |col cor| > 0.9999"), min(cc) > 0.9999, sprintf("min %.10f", min(cc)))
 }
 
@@ -94,18 +99,18 @@ d <- max(abs(g3$simscore.cosine - g1$simscore.cosine))
 chk("concordance max abs diff < 1e-6", d < 1e-6, sprintf("%.3e", d))
 
 ## ---- feature loadings, over the components both generations retain ---------
-kP <- min(ncol(g3$skymap.P), ncol(g1$skymap.P))
-cc <- colcor(g3$skymap.P, g1$skymap.P)
+kP <- min(ncol(g3$P), ncol(g1$skymap.P))
+cc <- colcor(g3$P, g1$skymap.P)
 chk(sprintf("skymap.P first %d cols |cor| > 0.9999", kP), min(cc) > 0.9999,
     sprintf("min %.10f", min(cc)))
-cc <- colcor(g3$skymap.Q, g1$skymap.Q)
+cc <- colcor(g3$Q, g1$skymap.Q)
 chk(sprintf("skymap.Q first %d cols |cor| > 0.9999", kP), min(cc) > 0.9999,
     sprintf("min %.10f", min(cc)))
 
 ## ---- THE decisive comparison: the published linkage numbers ----------------
 t1 <- get("SkymapLinkageTable", envir = gen1)(
   g1, gene.anno = anno, window = 1e6, mc.cores = 1, verbose = FALSE)
-t3 <- POLARIS::SkymapLinkageTable(
+t3 <- scOnion::OnionLinkageTable(
   g3, gene.anno = anno, window = 1e6, mc.cores = 1, verbose = FALSE)
 
 chk("linkage table same n rows", nrow(t3) == nrow(t1),
@@ -123,8 +128,8 @@ if (nrow(t3) == nrow(t1)) {
           sprintf("cor %.10f, max abs diff %.3e", rr, ad))
     }
     ## Ranking is what the benchmarks consume, so compare the ORDER too.
-    z3 <- POLARIS::SkymapZdev(t3); z1 <- t1[o, ]
-    z1$distbin <- cut(z1$dist, POLARIS::POLARIS_DIST_BREAKS,
+    z3 <- scOnion::OnionZdev(t3); z1 <- t1[o, ]
+    z1$distbin <- cut(z1$dist, scOnion::ONION_DIST_BREAKS,
                       include.lowest = TRUE, right = FALSE)
     mu0 <- tapply(z1$score_raw, z1$distbin, mean, na.rm = TRUE)
     z1$z_dev <- (z1$score_raw - as.numeric(mu0[as.character(z1$distbin)])) / z1$SE

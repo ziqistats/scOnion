@@ -1,3 +1,48 @@
+# scOnion 0.99.2
+
+## Renamed
+
+The package and the method are now called **scOnion**. Both were POLARIS
+until 0.99.1. The picture behind the name: the two denoised modalities
+are the two halves of an onion, each a nested set of rings, one ring per
+singular component. The halves meet at a small core whose SVD gives the joint
+fit, and the concordance score is the symmetry of the two halves at one cell.
+
+Everything that carried the old theme was renamed. Nothing numerical changed:
+a fit from `Onion()` is identical to one from `Polaris()` on the same input.
+
+| POLARIS 0.99.1 | scOnion 0.99.2 |
+|---|---|
+| `library(POLARIS)` | `library(scOnion)` |
+| `Polaris()` | `Onion()` |
+| `RunPolaris()`, returning `list(skymap, object)` | `RunOnion()`, returning `list(fit, object)` |
+| `SkymapSimScore()` | `OnionConcordance()` |
+| `SkymapLinkageTable()` | `OnionLinkageTable()` |
+| `SkymapZdev()` | `OnionZdev()` |
+| `SkymapUMAP()`, `SkymapUMAP.Chr()` | `OnionUMAP()`, `OnionUMAPChr()` |
+| `SkymapFindNeighbors()`, `SkymapFindNeighbors.Chr()` | `OnionFindNeighbors()`, `OnionFindNeighborsChr()` |
+| `polarisTSSRef()`, `polarisMakeTSSRef()`, `polarisSimulate()` | `onionTSSRef()`, `onionMakeTSSRef()`, `onionSimulate()` |
+| `polarisFitSummary()`, `polarisVersions()`, `polarisSpectrum()` | `onionFitSummary()`, `onionVersions()`, `onionSpectrum()` |
+| `POLARIS_DIST_BREAKS`, `POLARIS_MIN_DIST` | `ONION_DIST_BREAKS`, `ONION_MIN_DIST` |
+| fit class `skymap` | `Onion` |
+| `skymap.cell`, `skymap.U`, `skymap.V`, `skymap.P`, `skymap.Q`, `skymap.feature.chr` | `W`, `U`, `V`, `P`, `Q`, `per.chr` |
+| `fit$UMAPs$skymap.cell.UMAP`, `fit$NN.graph$skymap.cell.nb` | `fit$UMAPs$W.UMAP`, `fit$NN.graph$W.nb` |
+| `slot = "skymap.cell"` | `slot = "W"` |
+| joint-embedding columns `skyPC_1`, ...; Seurat key `skyPC_`, reduction `"polaris"` | `onion_1`, ...; key `onion_`, reduction `"onion"` |
+| `input.param$polaris.version` | `input.param$onion.version` |
+| the first argument `skymap` of every verb | `object` |
+
+## Compatibility, kept for one release cycle
+
+- Every old function name still works and warns that it is deprecated; see
+  `?"scOnion-deprecated"`. `RunPolaris()` keeps its old return shape and its
+  `"polaris"` reduction name.
+- Fits saved by POLARIS 0.99.x or by the pre-package script are upgraded on
+  entry by every function, and `asOnion()` does it once so the fit can be
+  resaved. The old element names still read through `$` and `[[` on an
+  `Onion`, with a warning shown once per session and name.
+- All of this is removed in 1.0.0.
+
 # POLARIS 0.99.1
 
 ## Compatibility

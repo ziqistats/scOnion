@@ -5,7 +5,7 @@
 .libPaths(c("/n/holystore01/LABS/xlin/Lab/ziqifu/Rlib_polaris", .libPaths()))
 B <- "/n/holystore01/LABS/xlin/Lab/ziqifu/POLAR"
 
-## Exactly the joint-embedding block of R/polaris.R, parameterised by convention.
+## Exactly the joint-embedding block of R/onion.R, parameterised by convention.
 rebuild <- function(Xs, Ys, r1, r2) {
   U1 <- Xs$u[, seq_len(r1), drop = FALSE]
   U2 <- Ys$u[, seq_len(r2), drop = FALSE]

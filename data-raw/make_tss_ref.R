@@ -3,7 +3,7 @@
 ## Provenance
 ## ----------
 ## hg38: derived from the Cell Ranger ARC GRCh38 reference GTF (the annotation
-## the POLARIS manuscript's 10x multiome data were aligned and quantified
+## the scOnion manuscript's 10x multiome data were aligned and quantified
 ## against), reduced to gene-level ranges. The source object used here is the
 ## project's cached GRanges:
 ##   /n/holystore01/LABS/xlin/Lab/ziqifu/tools/gtf/cellranger_hg38_genetype.rds
@@ -11,11 +11,11 @@
 ##   gr <- rtracklayer::import("refdata-cellranger-arc-GRCh38-2020-A-2.0.0/genes/genes.gtf.gz")
 ##   gr <- gr[gr$type == "gene"]
 ##
-## Only the columns POLARIS reads are kept: gene symbol, sequence name, the gene
+## Only the columns scOnion reads are kept: gene symbol, sequence name, the gene
 ## body's start and end, strand, and gene type. Strand is essential, because
-## GenomicRanges::resize(fix = "start") is strand-aware and is how POLARIS
+## GenomicRanges::resize(fix = "start") is strand-aware and is how scOnion
 ## places transcription start sites. All 39 sequence levels are retained,
-## including scaffolds; Polaris() itself restricts to the primary assembly.
+## including scaffolds; Onion() itself restricts to the primary assembly.
 ##
 ## Run from the package root with R >= 4.4.
 

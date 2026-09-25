@@ -1,6 +1,6 @@
 ## Provenance and audit helpers.
 ##
-## These exist because the POLARIS manuscript needs three things that the
+## These exist because the scOnion manuscript needs three things that the
 ## pre-package code could not supply:
 ##   * Supplementary Table 2 wants a version for every tool, and a whole-archive
 ##     search returned zero version strings.
@@ -10,35 +10,35 @@
 ##   * Supplementary Fig. 1 shows the denoiser spectrum, but the fit discarded
 ##     everything past the selected rank, so the figure could not be redrawn.
 
-#' Versions of POLARIS and its dependencies
+#' Versions of scOnion and its dependencies
 #'
-#' Reports the version of POLARIS, of R, and of the packages POLARIS depends on,
+#' Reports the version of scOnion, of R, and of the packages it depends on,
 #' in a form that can be pasted straight into a manuscript software table.
 #'
-#' @param which `"imports"` (default) reports POLARIS, R and everything in the
+#' @param which `"imports"` (default) reports scOnion, R and everything in the
 #'   `Imports` field. `"all"` adds the `Suggests` packages that are installed.
 #' @param installed.only Drop rows for packages that are not installed. Default
 #'   `TRUE`.
 #'
-#' @return A `data.frame` with columns `package` and `version`, POLARIS first,
+#' @return A `data.frame` with columns `package` and `version`, scOnion first,
 #'   then R, then dependencies alphabetically.
 #'
 #' @details
 #' Every fit also records this at the time it ran, in
-#' `skymap$input.param$versions`, so a saved `skymap` documents the software that
-#' produced it even if the environment later changes. [polarisFitSummary()]
+#' `fit$input.param$versions`, so a saved fit documents the software that
+#' produced it even if the environment later changes. [onionFitSummary()]
 #' surfaces that per fit.
 #'
 #' @examples
-#' polarisVersions()
+#' onionVersions()
 #'
-#' @seealso [polarisFitSummary()]
+#' @seealso [onionFitSummary()]
 #' @export
-polarisVersions <- function(which = c("imports", "all"), installed.only = TRUE) {
+onionVersions <- function(which = c("imports", "all"), installed.only = TRUE) {
   which <- match.arg(which)
   fields <- if (identical(which, "all")) c("Imports", "Suggests") else "Imports"
   pkgs <- unlist(lapply(fields, function(f) {
-    d <- utils::packageDescription("POLARIS", fields = f)
+    d <- utils::packageDescription("scOnion", fields = f)
     if (is.na(d) || !nzchar(d)) return(character())
     p <- trimws(strsplit(d, ",")[[1]])
     p <- sub("\\s*\\(.*\\)$", "", p)          # drop version constraints
@@ -53,8 +53,8 @@ polarisVersions <- function(which = c("imports", "all"), installed.only = TRUE) 
              error = function(e) NA_character_), character(1))
 
   out <- rbind(
-    data.frame(package = "POLARIS",
-               version = as.character(utils::packageVersion("POLARIS")),
+    data.frame(package = "scOnion",
+               version = as.character(utils::packageVersion("scOnion")),
                stringsAsFactors = FALSE),
     data.frame(package = "R",
                version = paste(R.version$major, R.version$minor, sep = "."),
@@ -70,7 +70,7 @@ polarisVersions <- function(which = c("imports", "all"), installed.only = TRUE) 
 
 #' @noRd
 .capture_versions <- function() {
-  v <- tryCatch(polarisVersions("imports"), error = function(e) NULL)
+  v <- tryCatch(onionVersions("imports"), error = function(e) NULL)
   if (is.null(v)) return(NULL)
   stats::setNames(as.list(v$version), v$package)
 }
@@ -78,15 +78,15 @@ polarisVersions <- function(which = c("imports", "all"), installed.only = TRUE) 
 #' Tabulate the settings and selected ranks of one or more fits
 #'
 #' One row per fit, giving the data dimensions, the thresholds supplied and the
-#' ranks the denoiser actually selected. This is the table the POLARIS
+#' ranks the denoiser actually selected. This is the table the scOnion
 #' manuscript reports per dataset.
 #'
-#' @param ... [skymap] objects, or a single named `list` of them. Names become
+#' @param ... [Onion][Onion-class] fits, or a single named `list` of them. Names become
 #'   the `dataset` column; unnamed fits are numbered.
 #'
 #' @return A `data.frame`, one row per fit: `dataset`, `n.cells`,
 #'   `n.features.X`, `n.features.Y`, `T1`, `T2`, `T3`, `r1`, `r2`, `r3`, `r4`,
-#'   `r5`, `x.sds`, `y.sds`, `reconcile.ranks`, `seed`, `polaris.version`.
+#'   `r5`, `x.sds`, `y.sds`, `reconcile.ranks`, `seed`, `onion.version`.
 #'
 #' @details
 #' `r1` and `r2` are the modality ranks after being set to their common minimum;
@@ -95,22 +95,25 @@ polarisVersions <- function(which = c("imports", "all"), installed.only = TRUE) 
 #'
 #' Fits produced by the pre-package script will show `NA` for the ranks, because
 #' that version captured `input.param` before the defaults were resolved. Recover
-#' those with `ncol(fit$skymap.U)` and `ncol(fit$skymap.P)`.
+#' those with `ncol(fit$U)` and `ncol(fit$P)`.
 #'
 #' @examples
 #' set.seed(1)
-#' a <- Polaris(polarisSimulate(n = 150, g = 50, p = 60, r = 4)$X,
-#'              polarisSimulate(n = 150, g = 50, p = 60, r = 4)$Y,
+#' a <- Onion(onionSimulate(n = 150, g = 50, p = 60, r = 4)$X,
+#'              onionSimulate(n = 150, g = 50, p = 60, r = 4)$Y,
 #'              x.sds = 0, verbose = FALSE)
-#' polarisFitSummary(pbmc = a)
+#' onionFitSummary(pbmc = a)
 #'
-#' @seealso [polarisVersions()], [polarisSpectrum()]
+#' @seealso [onionVersions()], [onionSpectrum()]
 #' @export
-polarisFitSummary <- function(...) {
+onionFitSummary <- function(...) {
   fits <- list(...)
-  if (length(fits) == 1L && is.list(fits[[1]]) && !inherits(fits[[1]], "skymap"))
+  ## A single unnamed list of fits is unwrapped; a single fit, even one saved
+  ## under the POLARIS names and so lacking the class, is not.
+  if (length(fits) == 1L && is.list(fits[[1]]) && !inherits(fits[[1]], "Onion") &&
+      !.is_legacy_fit(fits[[1]]))
     fits <- fits[[1]]
-  if (!length(fits)) stop("Supply at least one skymap.", call. = FALSE)
+  if (!length(fits)) stop("Supply at least one fit.", call. = FALSE)
   nm <- names(fits)
   if (is.null(nm)) nm <- rep("", length(fits))
   nm[!nzchar(nm)] <- paste0("fit", seq_along(fits))[!nzchar(nm)]
@@ -121,28 +124,28 @@ polarisFitSummary <- function(...) {
   }
 
   do.call(rbind, lapply(seq_along(fits), function(i) {
-    fit <- fits[[i]]
-    .check_skymap(fit)
+    fit <- .check_Onion(fits[[i]])
     ip <- fit$input.param
     if (is.null(ip)) ip <- list()
     data.frame(
       dataset      = nm[i],
-      n.cells      = nrow(fit$skymap.cell),
-      n.features.X = grab(ip, "n.features.X", if (!is.null(fit$skymap.P)) nrow(fit$skymap.P) else NA),
-      n.features.Y = grab(ip, "n.features.Y", if (!is.null(fit$skymap.Q)) nrow(fit$skymap.Q) else NA),
+      n.cells      = nrow(fit$W),
+      n.features.X = grab(ip, "n.features.X", if (!is.null(fit$P)) nrow(fit$P) else NA),
+      n.features.Y = grab(ip, "n.features.Y", if (!is.null(fit$Q)) nrow(fit$Q) else NA),
       T1 = grab(ip, "T1"), T2 = grab(ip, "T2"), T3 = grab(ip, "T3"),
       r1 = grab(ip, "r1"), r2 = grab(ip, "r2"),
       ## fall back to the embedding widths, which is how these have to be
       ## recovered from a pre-package fit
-      r3 = grab(ip, "r3", ncol(fit$skymap.U)),
-      r4 = grab(ip, "r4", ncol(fit$skymap.V)),
-      r5 = grab(ip, "r5", if (!is.null(fit$skymap.P)) ncol(fit$skymap.P) else NA),
+      r3 = grab(ip, "r3", ncol(fit$U)),
+      r4 = grab(ip, "r4", ncol(fit$V)),
+      r5 = grab(ip, "r5", if (!is.null(fit$P)) ncol(fit$P) else NA),
       x.sds = grab(ip, "x.sds"), y.sds = grab(ip, "y.sds"),
       ## Which rank convention the fit used. Decides which published analyses it
-      ## reproduces, and is invisible from ncol(skymap.cell).
+      ## reproduces, and is invisible from ncol(W).
       reconcile.ranks = grab(ip, "reconcile.ranks", NA),
       seed  = grab(ip, "seed"),
-      polaris.version = grab(ip, "polaris.version", NA_character_),
+      onion.version = grab(ip, "onion.version",
+                           grab(ip, "polaris.version", NA_character_)),
       stringsAsFactors = FALSE, row.names = NULL)
   }))
 }
@@ -153,7 +156,7 @@ polarisFitSummary <- function(...) {
 #' denoiser thresholds on, and which components were kept. Use it to audit rank
 #' selection, or to draw the spectrum figure.
 #'
-#' @param skymap A [skymap] from [Polaris()].
+#' @param object An [Onion][Onion-class] fit from [Onion()].
 #' @param modality `"X"`, `"Y"`, `"feature"`, or `"all"` (default) to stack all
 #'   three.
 #'
@@ -165,7 +168,7 @@ polarisFitSummary <- function(...) {
 #' The rank rule is
 #' \deqn{k = \max\{j : 1 \le j \le K-1,\ \sigma_j / \sigma_{j+1} > T\},}
 #' where \eqn{K} is the number of components **computed**, not the number of
-#' cells. That bound matters: `Polaris()` computes at most
+#' cells. That bound matters: `Onion()` computes at most
 #' `min(50, min(dim) - 1)` components, so the selected rank can never exceed
 #' that cap however slowly the spectrum decays. It is also why a threshold of
 #' `T = 1.01` can be reported as selecting anywhere from ten to thirty-odd
@@ -178,16 +181,16 @@ polarisFitSummary <- function(...) {
 #'
 #' @examples
 #' set.seed(1)
-#' sim <- polarisSimulate(n = 200, g = 60, p = 80, r = 5)
-#' fit <- Polaris(sim$X, sim$Y, x.sds = 0, verbose = FALSE)
-#' head(polarisSpectrum(fit, "X"))
+#' sim <- onionSimulate(n = 200, g = 60, p = 80, r = 5)
+#' fit <- Onion(sim$X, sim$Y, x.sds = 0, verbose = FALSE)
+#' head(onionSpectrum(fit, "X"))
 #'
-#' @seealso [polarisFitSummary()]
+#' @seealso [onionFitSummary()]
 #' @export
-polarisSpectrum <- function(skymap, modality = c("all", "X", "Y", "feature")) {
-  .check_skymap(skymap)
+onionSpectrum <- function(object, modality = c("all", "X", "Y", "feature")) {
+  object <- .check_Onion(object)
   modality <- match.arg(modality)
-  ip <- skymap$input.param
+  ip <- object$input.param
   if (is.null(ip)) ip <- list()
 
   one <- function(d, k, thr, lab) {
@@ -205,17 +208,17 @@ polarisSpectrum <- function(skymap, modality = c("all", "X", "Y", "feature")) {
 
   parts <- list()
   if (modality %in% c("all", "X"))
-    parts$X <- one(skymap$X.svd$d, ip$r1, ip$T1, "X")
+    parts$X <- one(object$X.svd$d, ip$r1, ip$T1, "X")
   if (modality %in% c("all", "Y"))
-    parts$Y <- one(skymap$Y.svd$d, ip$r2, ip$T2, "Y")
+    parts$Y <- one(object$Y.svd$d, ip$r2, ip$T2, "Y")
   if (modality %in% c("all", "feature")) {
-    fd <- if (!is.null(skymap$stdev.feature.full)) skymap$stdev.feature.full
-          else skymap$stdev.feature
+    fd <- if (!is.null(object$stdev.feature.full)) object$stdev.feature.full
+          else object$stdev.feature
     parts$feature <- one(fd, ip$r5, ip$T3, "feature")
   }
   parts <- parts[!vapply(parts, is.null, logical(1))]
   if (!length(parts))
-    stop("This skymap carries no spectrum for the requested modality.",
+    stop("This fit carries no spectrum for the requested modality.",
          call. = FALSE)
   out <- do.call(rbind, parts)
   rownames(out) <- NULL

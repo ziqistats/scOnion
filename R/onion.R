@@ -1,7 +1,7 @@
-#' Fit POLARIS to two paired modalities
+#' Fit scOnion to two paired modalities
 #'
-#' Performs the POLARIS spectral integration of two matrices measured on the
-#' same cells and returns a [skymap] object carrying the joint cell embedding,
+#' Performs the scOnion spectral integration of two matrices measured on the
+#' same cells and returns an [Onion][Onion-class] object carrying the joint cell embedding,
 #' the paired cell embeddings used for the concordance score, and the cross-modal
 #' feature embedding.
 #'
@@ -26,11 +26,11 @@
 #' @param r5 Dimension of `P` and `Q`. Derived from `T3` unless given.
 #' @param gene.chr.ref A `GRanges` with a `gene_name` metadata column and
 #'   strand, giving the genomic location of the features of `X`. Required for the
-#'   per-chromosome feature decomposition that [SkymapLinkageTable()] scores. If
+#'   per-chromosome feature decomposition that [OnionLinkageTable()] scores. If
 #'   `NULL` the per-chromosome step is skipped with a message and the fit still
-#'   returns the genome-wide `skymap.P` and `skymap.Q`, which is the right
+#'   returns the genome-wide `P` and `Q`, which is the right
 #'   behaviour for modality pairs without genomic coordinates such as CITE-seq.
-#'   See [polarisTSSRef()].
+#'   See [onionTSSRef()].
 #' @param chrs Chromosomes to decompose. Default `NULL` uses those actually
 #'   present in both `gene.chr.ref` and the feature names of `Y`.
 #' @param x.sds,y.sds Standard-deviation floors for retaining features of `X`
@@ -42,7 +42,7 @@
 #'   of the second modality. Set `x.sds = 0` for modality pairs where `X` is not
 #'   z-scored, as the CITE-seq analyses do.
 #' @param reconcile.ranks Collapse the two modality ranks to their common
-#'   minimum (`TRUE`, the default and the behaviour the POLARIS Methods
+#'   minimum (`TRUE`, the default and the behaviour the scOnion Methods
 #'   describe), or keep each modality's own selected rank (`FALSE`).
 #'
 #'   **This decides which published analyses a fit reproduces**, because the
@@ -54,22 +54,22 @@
 #'   50-component cap and collapsing discards around twenty protein components.
 #'
 #'   Either way `r3` and `r4` default to `min(r1, r2)`, so the joint embedding
-#'   has the same width and `ncol(skymap.cell)` does not reveal which convention
-#'   was used. [polarisFitSummary()] records it.
+#'   has the same width and `ncol(W)` does not reveal which convention
+#'   was used. [onionFitSummary()] records it.
 #' @param mc.cores Cores for the per-chromosome decomposition.
 #' @param seed Seed for the starting vector of the `X` decomposition. The
 #'   truncated SVD used for `X` draws a random start, so without a fixed seed
 #'   two fits of the same data differ slightly (about `1e-9` in the singular
 #'   values) and the caller's random stream is advanced as a side effect.
-#'   POLARIS therefore fixes the seed locally and restores the previous RNG state
+#'   scOnion therefore fixes the seed locally and restores the previous RNG state
 #'   afterwards, so a fit is bit-reproducible and leaves your random stream
 #'   untouched. Pass `NULL` for the older non-deterministic behaviour.
 #' @param verbose Report progress.
 #'
-#' @return A [skymap] object.
+#' @return An [Onion][Onion-class] object.
 #'
 #' @details
-#' The optimizer of the POLARIS objective is obtained from the SVD of
+#' The optimizer of the scOnion objective is obtained from the SVD of
 #' \eqn{(XX^\top)^{1/2}(YY^\top)^{1/2}}. Rather than forming those `n` x `n`
 #' operators, this implementation uses the exact identity
 #' \deqn{(XX^\top)^{1/2}(YY^\top)^{1/2} = U_1 \left[D_1 (U_1^\top U_2) D_2\right] U_2^\top,}
@@ -86,13 +86,13 @@
 #'
 #' @examples
 #' set.seed(1)
-#' sim <- polarisSimulate(n = 200, g = 60, p = 80, r = 5)
-#' fit <- Polaris(sim$X, sim$Y, x.sds = 0, verbose = FALSE)
+#' sim <- onionSimulate(n = 200, g = 60, p = 80, r = 5)
+#' fit <- Onion(sim$X, sim$Y, x.sds = 0, verbose = FALSE)
 #' fit
 #'
-#' @seealso [SkymapSimScore()], [SkymapLinkageTable()]
+#' @seealso [OnionConcordance()], [OnionLinkageTable()]
 #' @export
-Polaris <- function(X, Y,
+Onion <- function(X, Y,
                     T1 = 1.01, T2 = 1.01, T3 = 1.1,
                     r1 = NULL, r2 = NULL, r3 = NULL, r4 = NULL, r5 = NULL,
                     gene.chr.ref = NULL, chrs = NULL,
@@ -118,7 +118,7 @@ Polaris <- function(X, Y,
                   "e.g. Y <- Y[rownames(X), , drop = FALSE]."), call. = FALSE)
   } else {
     warning(paste0("X and/or Y have no cell names, so the pairing of rows ",
-                   "cannot be verified. POLARIS assumes row i of X and row i ",
+                   "cannot be verified. scOnion assumes row i of X and row i ",
                    "of Y are the same cell."), call. = FALSE)
   }
   if (anyDuplicated(rownames(X)))
@@ -171,7 +171,7 @@ Polaris <- function(X, Y,
 
   ## Whether to collapse the two modality ranks to their common minimum. This is
   ## NOT a cosmetic choice: it decides which published analyses a fit can
-  ## reproduce, because the POLARIS manuscript mixes the two conventions.
+  ## reproduce, because the scOnion manuscript mixes the two conventions.
   ##
   ##   reconcile.ranks = TRUE  (collapse, the Methods' "common minimum")
   ##       Fig. 6 (CITE-seq, all four donors) and the per-cell-type PBMC fits.
@@ -205,7 +205,7 @@ Polaris <- function(X, Y,
 
   ## ---- joint cell embedding -----------------------------------------------
   ## The operator being decomposed is (XX')^(1/2) (YY')^(1/2), which is the
-  ## objective in the POLARIS Methods. With X = U1 D1 V1' and Y = U2 D2 V2',
+  ## objective in the scOnion Methods. With X = U1 D1 V1' and Y = U2 D2 V2',
   ##   (XX')^(1/2) (YY')^(1/2) = U1 D1 U1' U2 D2 U2' = U1 [D1 (U1'U2) D2] U2'.
   ## U1 and U2 have orthonormal columns, so svd(core) = W S Z' gives the SVD of
   ## the full operator as (U1 W) S (U2 Z)', from an r x r problem instead of
@@ -237,31 +237,31 @@ Polaris <- function(X, Y,
   if (r3 < 1L || r4 < 1L)
     stop("r3 and r4 must be at least 1.", call. = FALSE)
 
-  skymap.cell <- cbind(prod.svd$u[, seq_len(r3), drop = FALSE],
+  W <- cbind(prod.svd$u[, seq_len(r3), drop = FALSE],
                        prod.svd$v[, seq_len(r4), drop = FALSE])
-  dimnames(skymap.cell) <- list(rownames(X), paste0("skyPC_", seq_len(r3 + r4)))
+  dimnames(W) <- list(rownames(X), paste0("onion_", seq_len(r3 + r4)))
 
   ## Kept as matrices, not data.frames. The original stored U and V as
-  ## data.frames, which made SkymapSimScore(metric = "cor") return an all-NA
+  ## data.frames, which made OnionConcordance(metric = "cor") return an all-NA
   ## matrix of the wrong length, because U[i, ] on a data.frame stays a one-row
   ## data.frame instead of collapsing to a vector. Every consumer in the
   ## analysis scripts already wrapped these in as.matrix().
-  skymap.U <- prod.svd$u[, seq_len(r3), drop = FALSE]
-  dimnames(skymap.U) <- list(rownames(X), paste0("uPC_", seq_len(r3)))
-  skymap.V <- prod.svd$v[, seq_len(r4), drop = FALSE]
-  dimnames(skymap.V) <- list(rownames(X), paste0("vPC_", seq_len(r4)))
+  U <- prod.svd$u[, seq_len(r3), drop = FALSE]
+  dimnames(U) <- list(rownames(X), paste0("uPC_", seq_len(r3)))
+  V <- prod.svd$v[, seq_len(r4), drop = FALSE]
+  dimnames(V) <- list(rownames(X), paste0("vPC_", seq_len(r4)))
 
   stdev.cell <- prod.svd$d[seq_len(max(r3, r4))]
 
   ## ---- feature loadings ---------------------------------------------------
   inf.emb.X <- if (methods::is(X, "sparseMatrix"))
-    matrixMultSparseDense(Matrix::t(X), skymap.cell)
-  else matrixMultiplyEigen(t(X), skymap.cell)
+    matrixMultSparseDense(Matrix::t(X), W)
+  else matrixMultiplyEigen(t(X), W)
   rownames(inf.emb.X) <- colnames(X)
 
   inf.emb.Y <- if (methods::is(Y, "sparseMatrix"))
-    matrixMultSparseDense(Matrix::t(Y), skymap.cell)
-  else matrixMultiplyEigen(t(Y), skymap.cell)
+    matrixMultSparseDense(Matrix::t(Y), W)
+  else matrixMultiplyEigen(t(Y), W)
   rownames(inf.emb.Y) <- colnames(Y)
 
   ## ---- joint feature embedding --------------------------------------------
@@ -278,37 +278,37 @@ Polaris <- function(X, Y,
   if (is.null(r5)) r5 <- .rank_from_ratio(XwY.svd$d, T3, "the feature embedding")
   r5 <- min(r5, length(XwY.svd$d))
 
-  skymap.P <- XwY.svd$u[, seq_len(r5), drop = FALSE]
-  dimnames(skymap.P) <- list(colnames(X), paste0("pPC_", seq_len(r5)))
-  skymap.Q <- XwY.svd$v[, seq_len(r5), drop = FALSE]
-  dimnames(skymap.Q) <- list(colnames(Y), paste0("qPC_", seq_len(r5)))
+  P <- XwY.svd$u[, seq_len(r5), drop = FALSE]
+  dimnames(P) <- list(colnames(X), paste0("pPC_", seq_len(r5)))
+  Q <- XwY.svd$v[, seq_len(r5), drop = FALSE]
+  dimnames(Q) <- list(colnames(Y), paste0("qPC_", seq_len(r5)))
   stdev.feature <- XwY.svd$d[seq_len(r5)]
   ## The full spectrum is kept as well (at most r3 + r4 values). The pre-package
   ## fit discarded everything past r5, which made the denoiser spectrum figure
-  ## impossible to redraw from a saved object. See polarisSpectrum().
+  ## impossible to redraw from a saved object. See onionSpectrum().
   stdev.feature.full <- XwY.svd$d
 
   ## ---- per-chromosome feature embedding -----------------------------------
-  skymap.feature.chr <- .feature_chr_embedding(
+  per.chr <- .feature_chr_embedding(
     inf.emb.X = inf.emb.X, inf.emb.Y = inf.emb.Y,
     gene.names = colnames(X), feature.names = colnames(Y),
     gene.chr.ref = gene.chr.ref, chrs = chrs, r5 = r5,
     mc.cores = mc.cores, verbose = verbose)
 
-  .new_skymap(list(
-    skymap.cell        = skymap.cell,
-    skymap.U           = skymap.U,
-    skymap.V           = skymap.V,
+  .new_Onion(list(
+    W                  = W,
+    U                  = U,
+    V                  = V,
     stdev.cell         = stdev.cell,
-    skymap.P           = skymap.P,
-    skymap.Q           = skymap.Q,
+    P                  = P,
+    Q                  = Q,
     stdev.feature      = stdev.feature,
     stdev.feature.full = stdev.feature.full,
-    skymap.feature.chr = skymap.feature.chr,
+    per.chr            = per.chr,
     X.svd              = X.svd,
     Y.svd              = Y.svd,
     ## Records the ranks that were actually used, not only the thresholds. The
-    ## POLARIS manuscript tabulates the selected r and r' per dataset, and the
+    ## scOnion manuscript tabulates the selected r and r' per dataset, and the
     ## earlier version captured this list before any default was resolved, so
     ## the saved provenance did not contain them.
     input.param        = list(T1 = T1, T2 = T2, T3 = T3,
@@ -316,14 +316,14 @@ Polaris <- function(X, Y,
                               r1.auto = r1.auto, r2.auto = r2.auto,
                               x.sds = x.sds, y.sds = y.sds, seed = seed,
                               reconcile.ranks = reconcile.ranks,
-                              n.cells = nrow(skymap.cell),
+                              n.cells = nrow(W),
                               n.features.X = ncol(X), n.features.Y = ncol(Y),
-                              polaris.version = as.character(
-                                utils::packageVersion("POLARIS")),
+                              onion.version = as.character(
+                                utils::packageVersion("scOnion")),
                               ## Records the software that produced this fit, so
-                              ## a saved skymap stays self-documenting even if
+                              ## a saved object stays self-documenting even if
                               ## the environment later changes. Surfaced by
-                              ## polarisFitSummary() and polarisVersions().
+                              ## onionFitSummary() and onionVersions().
                               versions = .capture_versions())
   ))
 }
@@ -339,13 +339,13 @@ Polaris <- function(X, Y,
 
   if (is.null(gene.chr.ref)) {
     say(paste0("gene.chr.ref not supplied, so the per-chromosome feature ",
-               "embedding is skipped. skymap.P and skymap.Q are still returned. ",
-               "SkymapLinkageTable() needs the per-chromosome embedding; supply ",
+               "embedding is skipped. P and Q are still returned. ",
+               "OnionLinkageTable() needs the per-chromosome embedding; supply ",
                "gene.chr.ref to compute it."))
     return(NULL)
   }
   if (!methods::is(gene.chr.ref, "GRanges"))
-    stop("`gene.chr.ref` must be a GRanges. See polarisTSSRef().", call. = FALSE)
+    stop("`gene.chr.ref` must be a GRanges. See onionTSSRef().", call. = FALSE)
   if (!"gene_name" %in% names(S4Vectors::mcols(gene.chr.ref)))
     stop("`gene.chr.ref` must have a `gene_name` metadata column.", call. = FALSE)
 
@@ -392,7 +392,7 @@ Polaris <- function(X, Y,
   if (all(empty)) {
     say(paste0("No chromosome had at least 3 genes and 3 features in common. ",
                "This is expected when the features of Y carry no genomic ",
-               "coordinates, as for CITE-seq; use skymap.P and skymap.Q."))
+               "coordinates, as for CITE-seq; use P and Q."))
   } else if (any(empty)) {
     say(sprintf("Skipped %s (fewer than 3 genes or features).",
                 paste(chrs[empty], collapse = ", ")))

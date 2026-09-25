@@ -6,7 +6,7 @@
 ^tests/regression_vs_script\.R$
 src/.*\.o$
 src/.*\.so$
-^POLARIS\.Rcheck$
+^scOnion\.Rcheck$
 ^tests/regression_gen1_vs_gen3\.R$
 ^tests/validate_convention\.R$
 ^LICENSE\.md$

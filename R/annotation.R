@@ -1,12 +1,12 @@
-#' Gene annotation for POLARIS linkage
+#' Gene annotation for scOnion linkage
 #'
 #' Returns a `GRanges` of gene bodies with a `gene_name` column and strand,
-#' suitable for the `gene.chr.ref` argument of [Polaris()] and the `gene.anno`
-#' argument of [SkymapLinkageTable()].
+#' suitable for the `gene.chr.ref` argument of [Onion()] and the `gene.anno`
+#' argument of [OnionLinkageTable()].
 #'
 #' @param genome Name of a bundled reference table. Currently only `"hg38"` is
 #'   bundled; call with any other value to see what is available. For every other
-#'   genome and build use [polarisMakeTSSRef()].
+#'   genome and build use [onionMakeTSSRef()].
 #'
 #' @return A stranded `GRanges` with `gene_name` and `gene_type` columns.
 #'
@@ -20,28 +20,28 @@
 #' ```
 #'
 #' That is guaranteed consistent with your peaks, which a bundled table is not.
-#' Use `polarisTSSRef()` when no annotation is attached, and
-#' [polarisMakeTSSRef()] for any build the package does not bundle.
+#' Use `onionTSSRef()` when no annotation is attached, and
+#' [onionMakeTSSRef()] for any build the package does not bundle.
 #'
-#' The bundled tables carry only the columns POLARIS reads: gene name, sequence
+#' The bundled tables carry only the columns scOnion reads: gene name, sequence
 #' name, TSS-bearing coordinate, strand and gene type. They are derived by
 #' `data-raw/make_tss_ref.R`, which records their provenance.
 #'
 #' @examples
-#' anno <- polarisTSSRef("hg38")
+#' anno <- onionTSSRef("hg38")
 #' head(anno)
 #'
-#' @seealso [polarisMakeTSSRef()]
+#' @seealso [onionMakeTSSRef()]
 #' @export
-polarisTSSRef <- function(genome = "hg38") {
-  dir <- system.file("extdata", package = "POLARIS")
+onionTSSRef <- function(genome = "hg38") {
+  dir <- system.file("extdata", package = "scOnion")
   have <- sub("^tss_", "", sub("\\.rds$", "",
               list.files(dir, pattern = "^tss_.*\\.rds$")))
   f <- file.path(dir, paste0("tss_", genome, ".rds"))
   if (!file.exists(f))
     stop(sprintf(paste0("No bundled annotation for '%s'. Bundled: %s. For any ",
                         "other genome or build, construct one from a TxDb, EnsDb ",
-                        "or GTF with polarisMakeTSSRef()."),
+                        "or GTF with onionMakeTSSRef()."),
                  genome, paste(have, collapse = ", ")), call. = FALSE)
   d <- readRDS(f)
   GenomicRanges::GRanges(
@@ -54,7 +54,7 @@ polarisTSSRef <- function(genome = "hg38") {
 
 #' Build a gene annotation from a TxDb, EnsDb or GTF
 #'
-#' Turns any gene-level annotation source into the `GRanges` that POLARIS
+#' Turns any gene-level annotation source into the `GRanges` that scOnion
 #' expects, so the package is not limited to the builds it bundles.
 #'
 #' @param x One of: a `TxDb` or `EnsDb` object; a `GRanges` that already has
@@ -65,7 +65,7 @@ polarisTSSRef <- function(genome = "hg38") {
 #' @return A stranded `GRanges` with a `gene_name` column.
 #'
 #' @details
-#' Strand is essential. POLARIS places transcription start sites with
+#' Strand is essential. scOnion places transcription start sites with
 #' `GenomicRanges::resize(fix = "start")`, which is strand-aware, so an
 #' unstranded annotation silently assigns minus-strand genes the wrong end of
 #' the gene. This function errors if strand information is absent.
@@ -73,15 +73,15 @@ polarisTSSRef <- function(genome = "hg38") {
 #' @examples
 #' \dontrun{
 #' # From a Bioconductor annotation package
-#' anno <- polarisMakeTSSRef(EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86)
+#' anno <- onionMakeTSSRef(EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86)
 #'
 #' # From the GTF that the reads were aligned against, which is the safest source
-#' anno <- polarisMakeTSSRef("refdata-cellranger-arc-GRCh38/genes/genes.gtf.gz")
+#' anno <- onionMakeTSSRef("refdata-cellranger-arc-GRCh38/genes/genes.gtf.gz")
 #' }
 #'
-#' @seealso [polarisTSSRef()]
+#' @seealso [onionTSSRef()]
 #' @export
-polarisMakeTSSRef <- function(x, gene.name.column = "gene_name") {
+onionMakeTSSRef <- function(x, gene.name.column = "gene_name") {
 
   gr <- if (is.character(x)) {
     if (!requireNamespace("rtracklayer", quietly = TRUE))
@@ -117,7 +117,7 @@ polarisMakeTSSRef <- function(x, gene.name.column = "gene_name") {
 
   st <- as.character(GenomicRanges::strand(gr))
   if (all(st == "*"))
-    stop(paste0("`x` carries no strand information. POLARIS needs strand to ",
+    stop(paste0("`x` carries no strand information. scOnion needs strand to ",
                 "place transcription start sites; without it every minus-strand ",
                 "gene would get the wrong end of the gene as its TSS."),
          call. = FALSE)

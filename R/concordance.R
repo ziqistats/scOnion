@@ -5,16 +5,17 @@
 #' matched one to one through the SVD, a cell's coordinates in the two
 #' embeddings are directly comparable.
 #'
-#' @param skymap A [skymap] from [Polaris()].
+#' @param object An [Onion][Onion-class] fit from [Onion()]. A fit saved under
+#'   the POLARIS names is upgraded on entry, see [asOnion()].
 #' @param metric One or more of `"cosine"`, `"euclidean"`, `"inner.prod"`,
-#'   `"cor"`. Defaults to `"cosine"` alone, which is the metric the POLARIS
+#'   `"cor"`. Defaults to `"cosine"` alone, which is the metric the scOnion
 #'   concordance score is defined on.
 #' @param n.pc Number of paired components used. Defaults to all of them.
 #'
-#' @return The `skymap` with elements added in place:
+#' @return The fit with elements added in place:
 #'   \describe{
 #'     \item{`concordance`}{the rescaled score in \eqn{[0,1]}, present whenever
-#'       `"cosine"` is requested. This is the quantity the POLARIS manuscript
+#'       `"cosine"` is requested. This is the quantity the scOnion manuscript
 #'       calls the concordance score and the one to use for display and
 #'       thresholding.}
 #'     \item{`simscore.cosine`}{the raw cosine similarity in \eqn{[-1,1]}.}
@@ -35,22 +36,22 @@
 #' \eqn{[0,1]}. Returning `concordance` directly removes the need to rescale by
 #' hand at plotting time.
 #'
-#' All four metrics are invariant to the joint rotation that the POLARIS
+#' All four metrics are invariant to the joint rotation that the scOnion
 #' optimizer is defined up to, so each is well defined.
 #'
 #' @examples
 #' set.seed(1)
-#' sim <- polarisSimulate(n = 200, g = 60, p = 80, r = 5)
-#' fit <- Polaris(sim$X, sim$Y, x.sds = 0, verbose = FALSE)
-#' fit <- SkymapSimScore(fit)
+#' sim <- onionSimulate(n = 200, g = 60, p = 80, r = 5)
+#' fit <- Onion(sim$X, sim$Y, x.sds = 0, verbose = FALSE)
+#' fit <- OnionConcordance(fit)
 #' summary(fit$concordance)
 #'
 #' @export
-SkymapSimScore <- function(skymap,
+OnionConcordance <- function(object,
                            metric = c("cosine", "euclidean", "inner.prod", "cor"),
                            n.pc = NULL) {
 
-  .check_skymap(skymap, need = c("skymap.U", "skymap.V"))
+  object <- .check_Onion(object, need = c("U", "V"))
 
   ## match.arg with several.ok picks up the FULL default vector when the caller
   ## supplies nothing, which in the pre-package version meant a bare call
@@ -60,10 +61,10 @@ SkymapSimScore <- function(skymap,
   metric <- match.arg(metric, c("cosine", "euclidean", "inner.prod", "cor"),
                       several.ok = TRUE)
 
-  U <- as.matrix(skymap$skymap.U)
-  V <- as.matrix(skymap$skymap.V)
+  U <- as.matrix(object$U)
+  V <- as.matrix(object$V)
 
-  ## Clamp against BOTH factors: r3 and r4 are separately settable in Polaris(),
+  ## Clamp against BOTH factors: r3 and r4 are separately settable in Onion(),
   ## so ncol(U) and ncol(V) can differ and slicing V by ncol(U) would go out of
   ## bounds.
   avail <- min(ncol(U), ncol(V))
@@ -80,7 +81,7 @@ SkymapSimScore <- function(skymap,
   V <- V[, seq_len(n.pc), drop = FALSE]
 
   for (m in metric) {
-    skymap[[paste0("simscore.", m)]] <- switch(
+    object[[paste0("simscore.", m)]] <- switch(
       m,
       cosine     = as.vector(rowSums(U * V) /
                                (sqrt(rowSums(U * U)) * sqrt(rowSums(V * V)))),
@@ -100,9 +101,9 @@ SkymapSimScore <- function(skymap,
   }
 
   if ("cosine" %in% metric) {
-    skymap$concordance <- (skymap$simscore.cosine + 1) / 2
-    names(skymap$concordance) <- rownames(U)
+    object$concordance <- (object$simscore.cosine + 1) / 2
+    names(object$concordance) <- rownames(U)
   }
 
-  skymap
+  object
 }

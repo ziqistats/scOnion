@@ -1,4 +1,4 @@
-## Definitive reproduction test: the packaged POLARIS versus the CURRENT
+## Definitive reproduction test: the packaged scOnion versus the CURRENT
 ## polaris_function.R, on the same input with the same RNG start.
 ##
 ## This is the test that matters. The stored *_polaris_output.rds artifacts date
@@ -43,8 +43,8 @@ old <- OldSkymapSimScore(old, metric = "cosine")
 cat(sprintf("\nold script: %.1f s\n", as.numeric(difftime(Sys.time(), t0, units = "secs"))))
 
 t0 <- Sys.time()
-new <- POLARIS::Polaris(X, Y, gene.chr.ref = anno, mc.cores = 1, verbose = FALSE)
-new <- POLARIS::SkymapSimScore(new)
+new <- scOnion::Onion(X, Y, gene.chr.ref = anno, mc.cores = 1, verbose = FALSE)
+new <- scOnion::OnionConcordance(new)
 cat(sprintf("package:    %.1f s\n\n", as.numeric(difftime(Sys.time(), t0, units = "secs"))))
 
 pass <- TRUE
@@ -53,27 +53,32 @@ chk <- function(label, ok, detail = "") {
   cat(sprintf("[%s] %-44s %s\n", if (isTRUE(ok)) "PASS" else "FAIL", label, detail))
 }
 maxad <- function(a, b) max(abs(as.numeric(as.matrix(a)) - as.numeric(as.matrix(b))))
+## The package names its elements after the Methods symbols (W, U, V, P, Q,
+## per.chr); the reference objects keep the skymap.* names of the script era.
+.nm <- c(skymap.cell = "W", skymap.U = "U", skymap.V = "V", skymap.P = "P",
+         skymap.Q = "Q", skymap.feature.chr = "per.chr",
+         stdev.cell = "stdev.cell", stdev.feature = "stdev.feature")
 
-chk("gene set identical", identical(rownames(new$skymap.P), rownames(old$skymap.P)),
-    sprintf("%d genes", nrow(new$skymap.P)))
-chk("peak set identical", identical(rownames(new$skymap.Q), rownames(old$skymap.Q)),
-    sprintf("%d peaks", nrow(new$skymap.Q)))
+chk("gene set identical", identical(rownames(new$P), rownames(old$skymap.P)),
+    sprintf("%d genes", nrow(new$P)))
+chk("peak set identical", identical(rownames(new$Q), rownames(old$skymap.Q)),
+    sprintf("%d peaks", nrow(new$Q)))
 chk("ranks identical (r3, r4, r5)",
-    ncol(new$skymap.U) == ncol(old$skymap.U) &&
-    ncol(new$skymap.V) == ncol(old$skymap.V) &&
-    ncol(new$skymap.P) == ncol(old$skymap.P),
-    sprintf("r3=%d r4=%d r5=%d", ncol(new$skymap.U), ncol(new$skymap.V),
-            ncol(new$skymap.P)))
+    ncol(new$U) == ncol(old$skymap.U) &&
+    ncol(new$V) == ncol(old$skymap.V) &&
+    ncol(new$P) == ncol(old$skymap.P),
+    sprintf("r3=%d r4=%d r5=%d", ncol(new$U), ncol(new$V),
+            ncol(new$P)))
 
 for (s in c("skymap.cell", "skymap.U", "skymap.V", "skymap.P", "skymap.Q")) {
-  if (!identical(dim(as.matrix(new[[s]])), dim(as.matrix(old[[s]])))) {
+  if (!identical(dim(as.matrix(new[[.nm[[s]]]])), dim(as.matrix(old[[s]])))) {
     chk(paste(s, "dims"), FALSE, "dimension mismatch"); next
   }
-  d <- maxad(new[[s]], old[[s]])
+  d <- maxad(new[[.nm[[s]]]], old[[s]])
   chk(paste(s, "max abs diff < 1e-10"), d < 1e-10, sprintf("%.3e", d))
 }
 for (s in c("stdev.cell", "stdev.feature")) {
-  d <- maxad(new[[s]], old[[s]])
+  d <- maxad(new[[.nm[[s]]]], old[[s]])
   chk(paste(s, "max abs diff < 1e-10"), d < 1e-10, sprintf("%.3e", d))
 }
 
@@ -84,12 +89,12 @@ chk("concordance rescaled to [0,1]",
     maxad(new$concordance, (old$simscore.cosine + 1) / 2) < 1e-12)
 
 on <- names(which(!vapply(old$skymap.feature.chr, is.null, logical(1))))
-nn <- names(which(!vapply(new$skymap.feature.chr, is.null, logical(1))))
+nn <- names(which(!vapply(new$per.chr, is.null, logical(1))))
 chk("same chromosomes decomposed", identical(sort(on), sort(nn)),
     sprintf("%d vs %d", length(nn), length(on)))
 worst <- 0; worstch <- ""
 for (c0 in intersect(on, nn)) {
-  a <- new$skymap.feature.chr[[c0]]; b <- old$skymap.feature.chr[[c0]]
+  a <- new$per.chr[[c0]]; b <- old$skymap.feature.chr[[c0]]
   if (!identical(dim(a$P), dim(b$P)) || !identical(dim(a$Q), dim(b$Q))) {
     worst <- Inf; worstch <- c0; break
   }
@@ -102,7 +107,7 @@ chk("per-chr P/Q/stdev max abs diff < 1e-10", worst < 1e-10,
 ## Linkage table: the published estimator (no X/Y passed)
 told <- get("SkymapLinkageTable", envir = old.env)(
   old, gene.anno = anno, window = 1e6, mc.cores = 1, verbose = FALSE)
-tnew <- POLARIS::SkymapLinkageTable(
+tnew <- scOnion::OnionLinkageTable(
   new, gene.anno = anno, window = 1e6, mc.cores = 1, verbose = FALSE)
 chk("linkage table same n rows", nrow(tnew) == nrow(told),
     sprintf("%d vs %d", nrow(tnew), nrow(told)))

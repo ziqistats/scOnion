@@ -5,14 +5,14 @@
 #' each pair by the singular-value-weighted inner product of its loadings, and
 #' attaches a closed-form leave-one-cell-out standard error.
 #'
-#' @param skymap A [skymap] from [Polaris()], fitted with `gene.chr.ref` so that
+#' @param object An [Onion][Onion-class] fit from [Onion()], made with `gene.chr.ref` so that
 #'   it carries the per-chromosome feature embedding.
 #' @param gene.anno A `GRanges` with a `gene_name` metadata column and strand,
-#'   used to place transcription start sites. See [polarisTSSRef()]. Must be the
+#'   used to place transcription start sites. See [onionTSSRef()]. Must be the
 #'   annotation for the genome build the peaks were called against.
 #' @param window Half-width in bp of the cis window around the TSS. Peaks whose
 #'   **midpoint** falls within `window` of the TSS are candidates. Default
-#'   `1e6`, the value used throughout the POLARIS manuscript.
+#'   `1e6`, the value used throughout the scOnion manuscript.
 #' @param se Compute per-link standard errors, and from them the
 #'   empirical-Bayes shrunken score and local false sign rate. Default `TRUE`.
 #'   Setting `FALSE` returns `score_raw` and `dist` only and is much faster.
@@ -36,14 +36,14 @@
 #' another chromosome.
 #'
 #' The standard error is a fixed-embedding leave-one-cell-out jackknife that
-#' does not refit POLARIS. Writing the score as a bilinear form
+#' does not refit scOnion. Writing the score as a bilinear form
 #' \eqn{\mathrm{IPw} = x^\top K y} in the cell kernel \eqn{K = WW^\top}, all `n`
 #' omitted-cell scores follow in closed form from two matrix-vector products,
 #' and \eqn{\mathrm{SE} = \sqrt{\tfrac{n-1}{n}\sum_i (s_{(-i)} - \bar{s})^2}}.
 #' See the section below for exactly which \eqn{x} and \eqn{y} are used.
 #'
-#' `z_dev`, the genomic-distance-aware statistic that the POLARIS benchmarks
-#' rank by, is not a column here. Compute it with [SkymapZdev()], which needs
+#' `z_dev`, the genomic-distance-aware statistic that the scOnion benchmarks
+#' rank by, is not a column here. Compute it with [OnionZdev()], which needs
 #' the whole table in order to form the within-distance-bin baselines.
 #'
 #' @section Which vectors the standard error uses:
@@ -57,7 +57,7 @@
 #' This matters because the two are not close. On the published PBMC B-cell fit
 #' `r` is 8, and for a typical gene the rank-50 and rank-8 reconstructions
 #' correlate at only 0.53. The rank-50 form is the estimator behind every
-#' published POLARIS standard error, `z_dev` and `q_lfsr`, and is what this
+#' published scOnion standard error, `z_dev` and `q_lfsr`, and is what this
 #' function computes.
 #'
 #' If you pass `X` and `Y`, the standard error is instead computed on those raw
@@ -67,16 +67,16 @@
 #'
 #' @examples
 #' \dontrun{
-#' anno <- polarisTSSRef("hg38")
-#' fit  <- Polaris(X, Y, gene.chr.ref = anno, mc.cores = 4)
-#' tab  <- SkymapLinkageTable(fit, gene.anno = anno, mc.cores = 4)
-#' tab  <- SkymapZdev(tab)
+#' anno <- onionTSSRef("hg38")
+#' fit  <- Onion(X, Y, gene.chr.ref = anno, mc.cores = 4)
+#' tab  <- OnionLinkageTable(fit, gene.anno = anno, mc.cores = 4)
+#' tab  <- OnionZdev(tab)
 #' head(tab[order(-tab$z_dev), ])
 #' }
 #'
-#' @seealso [SkymapZdev()], [polarisTSSRef()]
+#' @seealso [OnionZdev()], [onionTSSRef()]
 #' @export
-SkymapLinkageTable <- function(skymap,
+OnionLinkageTable <- function(object,
                                gene.anno,
                                window = 1e6,
                                se = TRUE,
@@ -87,20 +87,20 @@ SkymapLinkageTable <- function(skymap,
                                verbose = TRUE) {
 
   say <- function(...) if (isTRUE(verbose)) message(...)
-  .check_skymap(skymap)
+  object <- .check_Onion(object)
 
-  if (is.null(skymap$skymap.feature.chr))
-    stop(paste0("This skymap has no per-chromosome feature embedding. Re-run ",
-                "Polaris() with gene.chr.ref supplied."), call. = FALSE)
+  if (is.null(object$per.chr))
+    stop(paste0("This fit has no per-chromosome feature embedding. Re-run ",
+                "Onion() with gene.chr.ref supplied."), call. = FALSE)
 
   if (missing(gene.anno) || is.null(gene.anno))
     stop(paste0("`gene.anno` is required: a GRanges with a gene_name column and ",
                 "strand, for the same genome build the peaks were called on. ",
-                "Use polarisTSSRef('hg38'), or polarisMakeTSSRef() to build one ",
+                "Use onionTSSRef('hg38'), or onionMakeTSSRef() to build one ",
                 "from a TxDb, EnsDb or GTF."), call. = FALSE)
   if (is.character(gene.anno))
     stop(paste0("`gene.anno` must be a GRanges, not a file path. Read it first, ",
-                "or use polarisTSSRef()."), call. = FALSE)
+                "or use onionTSSRef()."), call. = FALSE)
   if (!methods::is(gene.anno, "GRanges"))
     stop("`gene.anno` must be a GRanges.", call. = FALSE)
   if (!"gene_name" %in% names(S4Vectors::mcols(gene.anno)))
@@ -128,11 +128,11 @@ SkymapLinkageTable <- function(skymap,
   tss.df <- tss.df[!dup, ]
   rownames(tss.df) <- tss.df$gene
 
-  feat <- skymap$skymap.feature.chr
+  feat <- object$per.chr
   if (is.null(chrs)) chrs <- names(feat)
   chrs <- chrs[vapply(chrs, function(ch) !is.null(feat[[ch]]), logical(1))]
   if (!length(chrs))
-    stop("No chromosome in this skymap has a feature embedding.", call. = FALSE)
+    stop("No chromosome in this fit has a feature embedding.", call. = FALSE)
 
   ## ---- enumerate cis pairs and score them ---------------------------------
   build.chr <- function(ch) {
@@ -173,13 +173,13 @@ SkymapLinkageTable <- function(skymap,
   if (!se) return(tab[order(-tab$score_raw), ])
 
   ## ---- per-link jackknife standard error ----------------------------------
-  if (is.null(skymap$skymap.cell))
-    stop("skymap.cell is needed for the standard error.", call. = FALSE)
-  C <- as.matrix(skymap$skymap.cell)
+  if (is.null(object$W))
+    stop("W is needed for the standard error.", call. = FALSE)
+  C <- as.matrix(object$W)
   cells <- rownames(C)
   if (is.null(cells) || !length(cells))
-    stop(paste0("skymap.cell has no cell names, so cells cannot be matched. ",
-                "Re-run Polaris() with named rows on X and Y."), call. = FALSE)
+    stop(paste0("W has no cell names, so cells cannot be matched. ",
+                "Re-run Onion() with named rows on X and Y."), call. = FALSE)
 
   genes.u <- unique(tab$gene)
   peaks.u <- unique(tab$peak)
@@ -188,14 +188,14 @@ SkymapLinkageTable <- function(skymap,
   if (have.raw) {
     warning(paste0("X and Y were supplied, so the standard error is computed on ",
                    "the raw normalized matrices. This is NOT the estimator used ",
-                   "in the POLARIS manuscript, which is defined on the rank-r ",
+                   "in the scOnion manuscript, which is defined on the rank-r ",
                    "denoised vectors. Omit X and Y to reproduce published ",
                    "values."), call. = FALSE)
     if (is.null(rownames(X)) || is.null(rownames(Y)))
       stop("X and Y must have cell barcodes as rownames.", call. = FALSE)
     keep <- intersect(intersect(cells, rownames(X)), rownames(Y))
     if (length(keep) < 0.5 * nrow(C))
-      stop(sprintf(paste0("Only %d of %d skymap cells were found in X and Y; ",
+      stop(sprintf(paste0("Only %d of %d cells of the fit were found in X and Y; ",
                           "check that the barcodes match."),
                    length(keep), nrow(C)), call. = FALSE)
     cells <- keep
@@ -203,18 +203,18 @@ SkymapLinkageTable <- function(skymap,
     X <- X[cells, genes.u, drop = FALSE]
     Y <- Y[cells, peaks.u, drop = FALSE]
   } else {
-    if (is.null(skymap$X.svd) || is.null(skymap$Y.svd))
-      stop(paste0("This skymap has no stored SVDs, so the denoised vectors ",
-                  "cannot be reconstructed. Re-fit with Polaris(), or pass X ",
+    if (is.null(object$X.svd) || is.null(object$Y.svd))
+      stop(paste0("This fit has no stored SVDs, so the denoised vectors ",
+                  "cannot be reconstructed. Re-fit with Onion(), or pass X ",
                   "and Y (a different estimator)."), call. = FALSE)
-    if (is.null(rownames(skymap$skymap.P)) || is.null(rownames(skymap$skymap.Q)))
-      stop("skymap.P/Q need rownames to map features onto the stored SVDs.",
+    if (is.null(rownames(object$P)) || is.null(rownames(object$Q)))
+      stop("P/Q need rownames to map features onto the stored SVDs.",
            call. = FALSE)
-    Xs <- skymap$X.svd; Ys <- skymap$Y.svd
+    Xs <- object$X.svd; Ys <- object$Y.svd
     if (nrow(Xs$u) != nrow(C) || nrow(Ys$u) != nrow(C))
-      stop("The stored SVDs do not match skymap.cell in cell count.", call. = FALSE)
-    gi <- match(genes.u, rownames(skymap$skymap.P))
-    pj <- match(peaks.u, rownames(skymap$skymap.Q))
+      stop("The stored SVDs do not match W in cell count.", call. = FALSE)
+    gi <- match(genes.u, rownames(object$P))
+    pj <- match(peaks.u, rownames(object$Q))
     genes.u <- genes.u[!is.na(gi)]; gi <- gi[!is.na(gi)]
     peaks.u <- peaks.u[!is.na(pj)]; pj <- pj[!is.na(pj)]
     X <- Xs$u %*% (Xs$d * t(Xs$v[gi, , drop = FALSE]))
@@ -272,7 +272,7 @@ SkymapLinkageTable <- function(skymap,
     warning(paste0("The empirical-Bayes prior variance estimated as 0, meaning ",
                    "the average squared standard error exceeds the variance of ",
                    "the scores. score_adj will be all zero and q_lfsr all 1. ",
-                   "Rank by score_raw or by SkymapZdev() instead."),
+                   "Rank by score_raw or by OnionZdev() instead."),
             call. = FALSE)
 
   w <- tau2 / (tau2 + tab$SE^2)

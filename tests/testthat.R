@@ -1,4 +1,4 @@
 library(testthat)
-library(POLARIS)
+library(scOnion)
 
-test_check("POLARIS")
+test_check("scOnion")

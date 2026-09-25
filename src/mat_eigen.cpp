@@ -1,4 +1,4 @@
-// Dense and sparse-dense matrix products used by Polaris() for the feature-loading
+// Dense and sparse-dense matrix products used by Onion() for the feature-loading
 // projections. Ported from POLAR/scripts/RCPP/mat_eigen.cpp with three changes:
 //   1. Eigen::MappedSparseMatrix -> Eigen::Map<Eigen::SparseMatrix<double> >
 //      (MappedSparseMatrix is deprecated and slated for removal in Eigen 4).

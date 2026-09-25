@@ -2,10 +2,10 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 matrixMultiplyEigen <- function(A, B) {
-    .Call(`_POLARIS_matrixMultiplyEigen`, A, B)
+    .Call(`_scOnion_matrixMultiplyEigen`, A, B)
 }
 
 matrixMultSparseDense <- function(A, B) {
-    .Call(`_POLARIS_matrixMultSparseDense`, A, B)
+    .Call(`_scOnion_matrixMultSparseDense`, A, B)
 }
 
